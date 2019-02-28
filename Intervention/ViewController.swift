@@ -8,6 +8,7 @@
 
 import UIKit
 import AVFoundation
+import CoreBluetooth
 
 class ViewController: UIViewController {
 
@@ -23,6 +24,7 @@ class ViewController: UIViewController {
     @IBOutlet weak var intervalVal: UILabel!
     @IBOutlet weak var restingVal: UILabel!
     
+    var centralManager: CBCentralManager!
     var seconds = 0
     var timer = Timer()
     var isTimerRunning = false
@@ -50,6 +52,7 @@ class ViewController: UIViewController {
     
 
     func runTimer() {
+        UIApplication.shared.isIdleTimerDisabled = true
         isTimerRunning = true;
         timer = Timer.scheduledTimer(timeInterval: 1, target: self,
                                      selector: (#selector(ViewController.updateTimer)),
@@ -90,6 +93,7 @@ class ViewController: UIViewController {
     }
     
     func stopTimer() {
+        UIApplication.shared.isIdleTimerDisabled = false;
         isTimerRunning=false;
         timer.invalidate();
         timer = Timer();
@@ -132,3 +136,23 @@ class ViewController: UIViewController {
     
 }
 
+extension ViewController: CBCentralManagerDelegate{
+    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        switch central.state {
+        case .unknown:
+            print("central.state is .unknown")
+        case .resetting:
+            print("central.state is .resetting")
+        case .unsupported:
+            print("central.state is .unsupported")
+        case .unauthorized:
+            print("central.state is .unauthorized")
+        case .poweredOff:
+            print("central.state is .poweredOff")
+        case .poweredOn:
+            print("central.state is .poweredOn")
+        }
+    }
+    
+    
+}
