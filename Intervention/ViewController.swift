@@ -35,19 +35,21 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad();
         initTimes();
+        centralManager = CBCentralManager(delegate: self, queue: nil)
+
         // Do any additional setup after loading the view, typically from a nib.
     }
 
     //MARK: Actions
     
     @IBAction func setIntervalLength(_ sender: UISlider) {
-        intervalVal.text=String(Int(sender.value));
-        intervalSeconds=Int(sender.value)
+        intervalVal.text=String(Int(sender.value)*5);
+        intervalSeconds=Int(sender.value)*5
     }
 
     @IBAction func setRestingLength(_ sender: UISlider) {
-        restingVal.text=String(Int(sender.value));
-        restingSeconds=Int(sender.value)
+        restingVal.text=String(Int(sender.value)*5);
+        restingSeconds=Int(sender.value)*5
     }
     
 
@@ -100,13 +102,13 @@ class ViewController: UIViewController {
     }
     
     func initTimes() {
-        intervalVal.text=String(Int(intervalSlider.value));
-        restingVal.text=String(Int(restingSlider.value));
+        intervalVal.text=String(Int(intervalSlider.value)*5);
+        restingVal.text=String(Int(restingSlider.value)*5);
 
-        intervalLabel.text=String(Int(restingSlider.value));
+        intervalLabel.text=String(Int(restingSlider.value)*5);
         
-        intervalSeconds = Int(intervalSlider.value)
-        restingSeconds = Int(restingSlider.value)
+        intervalSeconds = Int(intervalSlider.value)*5
+        restingSeconds = Int(restingSlider.value)*5
         seconds = 0
     }
     
@@ -131,8 +133,6 @@ class ViewController: UIViewController {
     func playAlarm() {
         AudioServicesPlaySystemSound (1304)
     }
-    
-
     
 }
 
