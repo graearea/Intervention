@@ -26,18 +26,30 @@ class ViewController: UIViewController {
     
     var centralManager: CBCentralManager!
     var seconds = 0
+    var beat = true
     var timer = Timer()
     var isTimerRunning = false
     var restingSeconds = 0
     var intervalSeconds = 0
     var resting = true
-    
+    var heartRatePeripheral: CBPeripheral!
+    let heartRateServiceCBUUID = CBUUID(string: "0x180D")
+    let heartRateMeasurementCharacteristicCBUUID = CBUUID(string: "2A37")
+    let bodySensorLocationCharacteristicCBUUID = CBUUID(string: "2A38")
+    var heartRates = Array<Int>()
+
     override func viewDidLoad() {
         super.viewDidLoad();
         initTimes();
-        centralManager = CBCentralManager(delegate: self, queue: nil)
+        startupBluetooth()
+        
 
         // Do any additional setup after loading the view, typically from a nib.
+    }
+    
+    func startupBluetooth(){
+        centralManager = CBCentralManager(delegate: self, queue: nil)
+        
     }
 
     //MARK: Actions
@@ -61,8 +73,18 @@ class ViewController: UIViewController {
                                      userInfo: nil, repeats: true)
     }
     
+    func addToAverage(){
+        heartRates.append(Int(currentHeartRate.text!)!)
+        var total=0
+        heartRates.forEach{
+            total = total + $0
+        }
+        averageHeartRate.text = String(total / heartRates.count)
+    }
+    
     @objc
     func updateTimer() {
+        addToAverage()
         if(resting){
             restingSeconds -= 1
             if (restingSeconds<5){
@@ -112,6 +134,18 @@ class ViewController: UIViewController {
         seconds = 0
     }
     
+    func onHeartRateReceived(_ heartRate: Int){
+        currentHeartRate.text=String(heartRate)
+        print(".")
+        beat = (!beat)
+        if (beat){
+        currentHeartRate.textColor = UIColor.green
+        }
+        else {
+        currentHeartRate.textColor = UIColor.blue
+        }
+    }
+    
     @IBAction func goClicked(_ sender: UIButton) {
         
         if (!isTimerRunning){
@@ -151,8 +185,76 @@ extension ViewController: CBCentralManagerDelegate{
             print("central.state is .poweredOff")
         case .poweredOn:
             print("central.state is .poweredOn")
+
+            centralManager.scanForPeripherals(withServices: [heartRateServiceCBUUID])
+            
         }
     }
     
+    func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
+        print(peripheral)
+        heartRatePeripheral = peripheral
+        centralManager.stopScan()
+        centralManager.connect(heartRatePeripheral)
+        heartRatePeripheral.delegate=self
+    }
     
+    func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        print("connected")
+        heartRatePeripheral.discoverServices([heartRateServiceCBUUID])
+        
+    }
+}
+
+extension ViewController: CBPeripheralDelegate {
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        guard let services = peripheral.services else { return }
+        
+        for service in services {
+            print(service)
+            peripheral.discoverCharacteristics(nil, for: service)
+
+        }
+    }
+    
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService,  error: Error?) {
+        guard let characteristics = service.characteristics else { return }
+        
+        for characteristic in characteristics {
+            print(characteristic)
+            if characteristic.properties.contains(.read) {
+                print("\(characteristic.uuid): properties contains .read")
+            }
+            if characteristic.properties.contains(.notify) {
+                print("\(characteristic.uuid): properties contains .notify")
+                peripheral.setNotifyValue(true, for: characteristic)
+
+            }
+        }
+    }
+    
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic,
+                    error: Error?) {
+        switch characteristic.uuid {
+        case heartRateMeasurementCharacteristicCBUUID:
+            let bpm = heartRate(from: characteristic)
+            onHeartRateReceived(bpm)
+        default:
+            print("Unhandled Characteristic UUID: \(characteristic.uuid)")
+        }
+    }
+    
+    private func heartRate(from characteristic: CBCharacteristic) -> Int {
+        guard let characteristicData = characteristic.value else { return -1 }
+        let byteArray = [UInt8](characteristicData)
+        
+        let firstBitValue = byteArray[0] & 0x01
+        if firstBitValue == 0 {
+            // Heart Rate Value Format is in the 2nd byte
+            return Int(byteArray[1])
+        } else {
+            // Heart Rate Value Format is in the 2nd and 3rd bytes
+            return (Int(byteArray[1]) << 8) + Int(byteArray[2])
+        }
+    }
 }
