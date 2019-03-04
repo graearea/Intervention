@@ -21,16 +21,22 @@ class ViewController: UIViewController {
     @IBOutlet weak var intervalLabel: UILabel!
     @IBOutlet weak var intervalSlider: UISlider!
     @IBOutlet weak var restingSlider: UISlider!
+    @IBOutlet weak var breakSlider: UISlider!
     @IBOutlet weak var intervalVal: UILabel!
     @IBOutlet weak var restingVal: UILabel!
+    @IBOutlet weak var statusBar: UITextField!
+    @IBOutlet weak var intervalCounter: UILabel!
+    @IBOutlet weak var breakCounter: UILabel!
     
     var centralManager: CBCentralManager!
     var seconds = 0
     var beat = true
     var timer = Timer()
     var isTimerRunning = false
+    var hrmConnected=false
     var restingSeconds = 0
     var intervalSeconds = 0
+    var intervalCount = 0
     var resting = true
     var heartRatePeripheral: CBPeripheral!
     let heartRateServiceCBUUID = CBUUID(string: "0x180D")
@@ -64,6 +70,11 @@ class ViewController: UIViewController {
         restingSeconds=Int(sender.value)*5
     }
     
+    @IBAction func breakSlider(_ sender: UISlider) {
+        breakCounter.text=String(Int(sender.value))
+        
+    }
+    
 
     func runTimer() {
         UIApplication.shared.isIdleTimerDisabled = true
@@ -73,7 +84,10 @@ class ViewController: UIViewController {
                                      userInfo: nil, repeats: true)
     }
     
+    var ignore = 5
     func addToAverage(){
+        ignore-=1
+        if ignore>0 {return}
         heartRates.append(Int(currentHeartRate.text!)!)
         var total=0
         heartRates.forEach{
@@ -82,19 +96,22 @@ class ViewController: UIViewController {
         averageHeartRate.text = String(total / heartRates.count)
     }
     
+    var currentColour=UIColor.white
     @objc
     func updateTimer() {
-        addToAverage()
+        if(hrmConnected) {addToAverage()}
         if(resting){
             restingSeconds -= 1
             if (restingSeconds<5){
                 playTick()
             }
             if (restingSeconds==0){
-                self.view.backgroundColor = UIColor.red
-                intervalSeconds = Int(intervalSlider.value)
+                currentColour=UIColor.white
+                self.view.backgroundColor = currentColour
+                intervalSeconds = Int(intervalSlider.value*5)
                 resting=false
-                playAlarm()
+                playTick()
+//                playAlarm()
             }
             intervalLabel.text = "\(restingSeconds)"
         } else{
@@ -103,17 +120,30 @@ class ViewController: UIViewController {
                 playTick()
             }
             if (intervalSeconds==0){
-                self.view.backgroundColor = UIColor.white
-                restingSeconds = Int(restingSlider.value)
+                intervalCount+=1
+                intervalCounter.text=String(intervalCount)
+                currentColour=UIColor.yellow
+                self.view.backgroundColor = currentColour
+                if((intervalCount%Int(breakCounter.text!)!)==0){
+                    restingSeconds = Int(restingSlider.value*5*4)
+                } else{
+                    restingSeconds = Int(restingSlider.value*5)
+                }
+                
                 resting=true
-                playAlarm()
+                playTick()
             }
             intervalLabel.text = "\(intervalSeconds)"
         }
         
         seconds += 1
-        
-        timerLabel.text = "\(seconds)" //This will update the label.
+        let secs=seconds%60
+        let mins=seconds/60
+        if(secs>10){
+            timerLabel.text = "\(mins):\(secs)"
+        }else{
+            timerLabel.text = "\(mins):0\(secs)"
+        }
     }
     
     func stopTimer() {
@@ -126,8 +156,9 @@ class ViewController: UIViewController {
     func initTimes() {
         intervalVal.text=String(Int(intervalSlider.value)*5);
         restingVal.text=String(Int(restingSlider.value)*5);
-
+        breakCounter.text=(String(Int(breakSlider.value)))
         intervalLabel.text=String(Int(restingSlider.value)*5);
+        intervalCounter.text="0"
         
         intervalSeconds = Int(intervalSlider.value)*5
         restingSeconds = Int(restingSlider.value)*5
@@ -139,11 +170,17 @@ class ViewController: UIViewController {
         print(".")
         beat = (!beat)
         if (beat){
-        currentHeartRate.textColor = UIColor.green
+            currentHeartRate.textColor = UIColor.green
+            self.view.backgroundColor = (heartRate>180) ? UIColor.orange : currentColour
+            
         }
         else {
-        currentHeartRate.textColor = UIColor.blue
+            currentHeartRate.textColor = UIColor.blue
+            self.view.backgroundColor = (heartRate>180) ? UIColor.red : currentColour
+
         }
+        
+        
     }
     
     @IBAction func goClicked(_ sender: UIButton) {
@@ -168,6 +205,10 @@ class ViewController: UIViewController {
         AudioServicesPlaySystemSound (1304)
     }
     
+    func printStatus(_ status: String){
+        print(status)
+        statusBar.text=status
+    }
 }
 
 extension ViewController: CBCentralManagerDelegate{
@@ -200,7 +241,7 @@ extension ViewController: CBCentralManagerDelegate{
     }
     
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        print("connected")
+        printStatus("connected")
         heartRatePeripheral.discoverServices([heartRateServiceCBUUID])
         
     }
@@ -211,7 +252,7 @@ extension ViewController: CBPeripheralDelegate {
         guard let services = peripheral.services else { return }
         
         for service in services {
-            print(service)
+            printStatus("found HRM")
             peripheral.discoverCharacteristics(nil, for: service)
 
         }
@@ -222,15 +263,16 @@ extension ViewController: CBPeripheralDelegate {
         
         for characteristic in characteristics {
             print(characteristic)
-            if characteristic.properties.contains(.read) {
-                print("\(characteristic.uuid): properties contains .read")
-            }
             if characteristic.properties.contains(.notify) {
                 print("\(characteristic.uuid): properties contains .notify")
                 peripheral.setNotifyValue(true, for: characteristic)
-
+                printStatus("found HRM function")
             }
         }
+    }
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        hrmConnected=false
+        printStatus("HRM disconnected?")
     }
     
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic,
@@ -239,6 +281,7 @@ extension ViewController: CBPeripheralDelegate {
         case heartRateMeasurementCharacteristicCBUUID:
             let bpm = heartRate(from: characteristic)
             onHeartRateReceived(bpm)
+            hrmConnected=true
         default:
             print("Unhandled Characteristic UUID: \(characteristic.uuid)")
         }
