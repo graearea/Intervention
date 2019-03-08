@@ -33,7 +33,7 @@ class ViewController: UIViewController {
     @IBOutlet weak var btButton: UIButton!
 
     var centralManager: CBCentralManager!
-    var seconds = 0
+    var totalSeconds = 0
     var beat = true
     var timer = Timer()
     var isTimerRunning = false
@@ -127,8 +127,8 @@ class ViewController: UIViewController {
 
         }
 
-        seconds += 1
-        setTime(timerLabel, seconds)
+        totalSeconds += 1
+        setTime(timerLabel, totalSeconds)
     }
 
     private func interval() {
@@ -140,9 +140,7 @@ class ViewController: UIViewController {
             printStatus("Interval count: \(intervalCount)")
 
             if (intervalCount == 0) {
-                currentColour = UIColor.gray
-                restingSeconds = Int(breakTimeSlider.value) * 60
-                intervalCount = Int(breakSlider.value)
+                takeABreak()
             } else {
                 currentColour = UIColor.white
                 restingSeconds = Int(restingSlider.value) * 5
@@ -156,6 +154,17 @@ class ViewController: UIViewController {
         } else if (intervalSeconds < 5) {
             playTick()
         }
+
+        if(btTestMode){
+            let s: Int = Int(currentHeartRate.text ?? "0")!+3
+            onHeartRateReceived(Int(s))
+        }
+    }
+
+    private func takeABreak() {
+        currentColour = UIColor.gray
+        restingSeconds = Int(breakTimeSlider.value) * 60
+        intervalCount = Int(breakSlider.value)
     }
 
     private func rest() {
@@ -173,6 +182,10 @@ class ViewController: UIViewController {
             setTime(intervalLabel, intervalSeconds)
         } else if (restingSeconds < 5) {
             playTick()
+        }
+        if(btTestMode){
+            let s: Int = Int(currentHeartRate.text ?? "0")!-3
+            onHeartRateReceived(Int(s))
         }
 
     }
@@ -193,24 +206,19 @@ class ViewController: UIViewController {
     }
 
     func initTimes() {
+        totalSeconds = 0
         intervalSeconds = Int(intervalSlider.value) * 5
         restingSeconds = Int(restingSlider.value) * 5
+        intervalCount = Int(breakSlider.value)
 
         intervalVal.text = String(intervalSeconds);
         restingVal.text = String(restingSeconds);
         intervalLabel.text = String(restingSeconds);
 
-        intervalCount = Int(breakSlider.value)
         breakCounter.text = (String(intervalCount))
         intervalCounter.text = (String(intervalCount))
         breakTimeCounter.text = String(Int(breakTimeSlider.value))
 
-        seconds = 0
-    }
-
-    private func getTimeFromSlider(_ slider: UISlider) -> String {
-
-        return String(Int(slider.value) * 5)
     }
 
     func onHeartRateReceived(_ heartRate: Int) {
@@ -227,6 +235,8 @@ class ViewController: UIViewController {
         }
     }
 
+    var ct: Int64 = 0
+
     @IBAction func btClicked(_ sender: UIButton) {
         let now = Int64(NSDate().timeIntervalSince1970 * 1000)
         let bob = (now - ct) / 1000
@@ -235,6 +245,7 @@ class ViewController: UIViewController {
         if (bob > 3) {
             btTestMode = true
             printStatus("TEST MODE!!!!!")
+            currentHeartRate.text="160"
         } else {
             if heartRatePeripheral != nil {
                 printStatus("disconnecting")
@@ -245,7 +256,6 @@ class ViewController: UIViewController {
         }
     }
 
-    var ct: Int64 = 0
 
     @IBAction func btDown(_ sender: Any) {
         ct = Int64(NSDate().timeIntervalSince1970 * 1000)
