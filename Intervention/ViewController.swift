@@ -307,7 +307,7 @@ extension ViewController: CBCentralManagerDelegate {
         case .poweredOff:
             print("central.state is .poweredOff")
         case .poweredOn:
-            printStatus("central.state is .poweredOn")
+            printStatus("scanning for HRM")
             centralManager.scanForPeripherals(withServices: [heartRateServiceCBUUID])
 
         }
