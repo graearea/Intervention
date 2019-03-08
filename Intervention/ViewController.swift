@@ -10,10 +10,11 @@ import UIKit
 import AVFoundation
 import CoreBluetooth
 
+
 class ViewController: UIViewController {
 
     //MARK: Properties
-    
+
     @IBOutlet weak var currentHeartRate: UILabel!
     @IBOutlet weak var averageHeartRate: UILabel!
     @IBOutlet weak var timerLabel: UILabel!
@@ -29,215 +30,260 @@ class ViewController: UIViewController {
     @IBOutlet weak var intervalCounter: UILabel!
     @IBOutlet weak var breakCounter: UILabel!
     @IBOutlet weak var breakTimeCounter: UILabel!
-    
+    @IBOutlet weak var btButton: UIButton!
+
     var centralManager: CBCentralManager!
     var seconds = 0
     var beat = true
     var timer = Timer()
     var isTimerRunning = false
-    var hrmConnected=false
+    var hrmConnected = false
     var restingSeconds = 0
     var intervalSeconds = 0
     var intervalCount = 0
     var resting = true
-    var heartRatePeripheral: CBPeripheral!
+    var heartRatePeripheral: CBPeripheral?
     let heartRateServiceCBUUID = CBUUID(string: "0x180D")
     let heartRateMeasurementCharacteristicCBUUID = CBUUID(string: "2A37")
     let bodySensorLocationCharacteristicCBUUID = CBUUID(string: "2A38")
     var heartRates = Array<Int>()
+    var btTestMode = false
 
     override func viewDidLoad() {
         super.viewDidLoad();
+        roundDemButtons()
         initTimes();
         startupBluetooth()
-        
-
-        // Do any additional setup after loading the view, typically from a nib.
     }
-    
-    func startupBluetooth(){
+
+
+    private func roundDemButtons() {
+        goButton.layer.cornerRadius = 4
+        btButton.layer.cornerRadius = 4
+    }
+
+    func startupBluetooth() {
         centralManager = CBCentralManager(delegate: self, queue: nil)
-        
+
     }
 
     //MARK: Actions
-    
+
     @IBAction func setIntervalLength(_ sender: UISlider) {
-        intervalVal.text=String(Int(sender.value)*5);
-        intervalSeconds=Int(sender.value)*5
+        intervalVal.text = String(Int(sender.value) * 5);
+        intervalSeconds = Int(sender.value) * 5
     }
 
     @IBAction func setRestingLength(_ sender: UISlider) {
-        restingVal.text=String(Int(sender.value)*5);
-        restingSeconds=Int(sender.value)*5
+        restingVal.text = String(Int(sender.value) * 5);
+        restingSeconds = Int(sender.value) * 5
     }
-    
+
     @IBAction func breakTimeSlider(_ sender: UISlider) {
-        breakTimeCounter.text=String(Int(sender.value))
+        breakTimeCounter.text = String(Int(sender.value))
     }
-    
+
     @IBAction func breakSlider(_ sender: UISlider) {
-        intervalCount=Int(sender.value)
-        breakCounter.text=String(intervalCount)
-        intervalCounter.text=String(intervalCount)
+        intervalCount = Int(sender.value)
+        breakCounter.text = String(intervalCount)
+        intervalCounter.text = String(intervalCount)
     }
-    
+
 
     func runTimer() {
         UIApplication.shared.isIdleTimerDisabled = true
         isTimerRunning = true;
         timer = Timer.scheduledTimer(timeInterval: 1, target: self,
-                                     selector: (#selector(ViewController.updateTimer)),
-                                     userInfo: nil, repeats: true)
+                selector: (#selector(ViewController.updateTimer)),
+                userInfo: nil, repeats: true)
     }
-    
+
     var ignore = 5
-    func addToAverage(){
-        ignore-=1
-        if ignore>0 {return}
+
+    func addToAverage() {
+        ignore -= 1
+        if ignore > 0 {
+            return
+        }
         heartRates.append(Int(currentHeartRate.text!)!)
-        var total=0
-        heartRates.forEach{
+        var total = 0
+        heartRates.forEach {
             total = total + $0
         }
         averageHeartRate.text = String(total / heartRates.count)
     }
-    
-    var currentColour=UIColor.white
+
+    var currentColour = UIColor.white
+
     @objc
     func updateTimer() {
-        if(hrmConnected) {addToAverage()}
-        if(resting){
-            restingSeconds -= 1
-            setTime(intervalLabel,restingSeconds)
-            if (restingSeconds<5){
-                playTick()
-            }
-            if (restingSeconds==0){
-                intervalCount-=1
-                intervalCounter.text=String(intervalCount)
-                currentColour=UIColor.yellow
-                self.view.backgroundColor = currentColour
-                intervalSeconds = Int(intervalSlider.value)*5
-                resting=false
-                playTick()
-
-                setTime(intervalLabel,intervalSeconds)
-            }
-
-            
-        } else{
-            intervalSeconds -= 1
-            setTime(intervalLabel,intervalSeconds)
-            if (intervalSeconds<5){
-                playTick()
-            }
-            if (intervalSeconds==0){
-                
-                printStatus("Interval count: \(intervalCount)")
-                
-                if(intervalCount == 0){
-                    currentColour=UIColor.gray
-                    restingSeconds = Int(breakTimeSlider.value)*60
-                    intervalCount=Int(breakSlider.value)
-                } else{
-                    currentColour=UIColor.white
-                    restingSeconds = Int(restingSlider.value)*5
-                }
-                intervalCounter.text=String(intervalCount)
-                self.view.backgroundColor = currentColour
-
-                resting=true
-                playTick()
-                setTime(intervalLabel,restingSeconds)
-            }
-            
+        if (hrmConnected) {
+            addToAverage()
         }
-        
+        if (resting) {
+            rest()
+        } else {
+            interval()
+
+        }
+
         seconds += 1
-        setTime(timerLabel,seconds)
+        setTime(timerLabel, seconds)
     }
 
-    func setTime(_ label: UILabel, _ time: Int){
-        let secs=time%60
-        let mins=time/60
-        let secsText: String = secs>9 ? "\(secs)": "0\(secs)"
-        let minsText: String = mins>0 ? "\(mins):": ""
-        label.text = minsText+secsText
+    private func interval() {
+        intervalSeconds -= 1
+        setTime(intervalLabel, intervalSeconds)
+
+        if (intervalSeconds == 0) {
+
+            printStatus("Interval count: \(intervalCount)")
+
+            if (intervalCount == 0) {
+                currentColour = UIColor.gray
+                restingSeconds = Int(breakTimeSlider.value) * 60
+                intervalCount = Int(breakSlider.value)
+            } else {
+                currentColour = UIColor.white
+                restingSeconds = Int(restingSlider.value) * 5
+            }
+            intervalCounter.text = String(intervalCount)
+            self.view.backgroundColor = currentColour
+
+            resting = true
+            playStop()
+            setTime(intervalLabel, restingSeconds)
+        } else if (intervalSeconds < 5) {
+            playTick()
+        }
     }
-    
+
+    private func rest() {
+        restingSeconds -= 1
+        setTime(intervalLabel, restingSeconds)
+        if (restingSeconds == 0) {
+            intervalCount -= 1
+            intervalCounter.text = String(intervalCount)
+            currentColour = UIColor.yellow
+            self.view.backgroundColor = currentColour
+            intervalSeconds = Int(intervalSlider.value) * 5
+            resting = false
+            playGo()
+
+            setTime(intervalLabel, intervalSeconds)
+        } else if (restingSeconds < 5) {
+            playTick()
+        }
+
+    }
+
+    func setTime(_ label: UILabel, _ time: Int) {
+        let secs = time % 60
+        let mins = time / 60
+        let secsText: String = secs > 9 ? "\(secs)" : "0\(secs)"
+        let minsText: String = mins > 0 ? "\(mins):" : ""
+        label.text = minsText + secsText
+    }
+
     func stopTimer() {
         UIApplication.shared.isIdleTimerDisabled = false;
-        isTimerRunning=false;
+        isTimerRunning = false;
         timer.invalidate();
         timer = Timer();
     }
-    
+
     func initTimes() {
-        intervalVal.text=String(Int(intervalSlider.value)*5);
-        restingVal.text=String(Int(restingSlider.value)*5);
-        breakCounter.text=(String(Int(breakSlider.value)))
-        intervalLabel.text=String(Int(restingSlider.value)*5);
-        intervalCounter.text=(String(Int(breakSlider.value)))
-        intervalCount=Int(breakSlider.value)
-        breakTimeCounter.text=String(Int(breakTimeSlider.value))
-        
-        intervalSeconds = Int(intervalSlider.value)*5
-        restingSeconds = Int(restingSlider.value)*5
+        intervalSeconds = Int(intervalSlider.value) * 5
+        restingSeconds = Int(restingSlider.value) * 5
+
+        intervalVal.text = String(intervalSeconds);
+        restingVal.text = String(restingSeconds);
+        intervalLabel.text = String(restingSeconds);
+
+        intervalCount = Int(breakSlider.value)
+        breakCounter.text = (String(intervalCount))
+        intervalCounter.text = (String(intervalCount))
+        breakTimeCounter.text = String(Int(breakTimeSlider.value))
+
         seconds = 0
     }
-    
-    func onHeartRateReceived(_ heartRate: Int){
-        currentHeartRate.text=String(heartRate)
+
+    private func getTimeFromSlider(_ slider: UISlider) -> String {
+
+        return String(Int(slider.value) * 5)
+    }
+
+    func onHeartRateReceived(_ heartRate: Int) {
+        currentHeartRate.text = String(heartRate)
         print(".")
         beat = (!beat)
-        if (beat){
+        if (beat) {
             currentHeartRate.textColor = UIColor.green
-            self.view.backgroundColor = (heartRate>180) ? UIColor.orange : currentColour
-            
-        }
-        else {
-            currentHeartRate.textColor = UIColor.blue
-            self.view.backgroundColor = (heartRate>180) ? UIColor.red : currentColour
-        }
-    }
-    
-    @IBAction func btClicked(_ sender: UIButton) {
-        printStatus("disconnecting")
-        centralManager.cancelPeripheralConnection(heartRatePeripheral)
-        printStatus("scanning again")
-        centralManager.scanForPeripherals(withServices: [heartRateServiceCBUUID])
+            self.view.backgroundColor = (heartRate > 180) ? UIColor.orange : currentColour
 
+        } else {
+            currentHeartRate.textColor = UIColor.blue
+            self.view.backgroundColor = (heartRate > 180) ? UIColor.red : currentColour
+        }
     }
-    
+
+    @IBAction func btClicked(_ sender: UIButton) {
+        let now = Int64(NSDate().timeIntervalSince1970 * 1000)
+        let bob = (now - ct) / 1000
+
+
+        if (bob > 3) {
+            btTestMode = true
+            printStatus("TEST MODE!!!!!")
+        } else {
+            if heartRatePeripheral != nil {
+                printStatus("disconnecting")
+                centralManager.cancelPeripheralConnection(heartRatePeripheral!)
+            }
+            printStatus("scanning again")
+            centralManager.scanForPeripherals(withServices: [heartRateServiceCBUUID])
+        }
+    }
+
+    var ct: Int64 = 0
+
+    @IBAction func btDown(_ sender: Any) {
+        ct = Int64(NSDate().timeIntervalSince1970 * 1000)
+    }
+
     @IBAction func goClicked(_ sender: UIButton) {
-        if (!isTimerRunning){
+
+        if (!isTimerRunning) {
             goButton.setTitle("STOP", for: .normal);
             runTimer();
-            
-        }else{
+
+        } else {
             goButton.setTitle("GO", for: .normal);
             stopTimer();
         }
     }
-    
+
     var player: AVAudioPlayer?
-    
+
     func playTick() {
-        AudioServicesPlaySystemSound (1203)
+        AudioServicesPlaySystemSound(1203)
     }
 
-    func playAlarm() {
-        AudioServicesPlaySystemSound (1304)
+    func playGo() {
+        AudioServicesPlaySystemSound(1023)
     }
-    
-    func printStatus(_ status: String){
+
+    func playStop() {
+        AudioServicesPlaySystemSound(1324)
+    }
+
+    func printStatus(_ status: String) {
         print(status)
-        statusBar.text=status
+        statusBar.text = status
     }
 }
 
-extension ViewController: CBCentralManagerDelegate{
+extension ViewController: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         switch central.state {
         case .unknown:
@@ -253,40 +299,44 @@ extension ViewController: CBCentralManagerDelegate{
         case .poweredOn:
             printStatus("central.state is .poweredOn")
             centralManager.scanForPeripherals(withServices: [heartRateServiceCBUUID])
-            
+
         }
     }
-    
-    func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
+
+    func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
         printStatus(peripheral.description)
         heartRatePeripheral = peripheral
         centralManager.stopScan()
         printStatus("stopped scan, connecting")
-        centralManager.connect(heartRatePeripheral)
-        heartRatePeripheral.delegate=self
+        centralManager.connect(peripheral)
+        peripheral.delegate = self
     }
-    
+
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         printStatus("connected, discovering services")
-        heartRatePeripheral.discoverServices([heartRateServiceCBUUID])
-        
+        peripheral.discoverServices([heartRateServiceCBUUID])
+
     }
 }
 
 extension ViewController: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        guard let services = peripheral.services else { return }
-        
+        guard let services = peripheral.services else {
+            return
+        }
+
         for service in services {
             printStatus("found HRM, discovering characteristics")
             peripheral.discoverCharacteristics(nil, for: service)
 
         }
     }
-    
-    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService,  error: Error?) {
-        guard let characteristics = service.characteristics else { return }
-        
+
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+        guard let characteristics = service.characteristics else {
+            return
+        }
+
         for characteristic in characteristics {
             print(characteristic)
             if characteristic.properties.contains(.notify) {
@@ -296,27 +346,30 @@ extension ViewController: CBPeripheralDelegate {
             }
         }
     }
+
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
-        hrmConnected=false
+        hrmConnected = false
         printStatus("HRM disconnected?")
     }
-    
+
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
         switch characteristic.uuid {
         case heartRateMeasurementCharacteristicCBUUID:
             let bpm = heartRate(from: characteristic)
             onHeartRateReceived(bpm)
-            hrmConnected=true
+            hrmConnected = true
         default:
             print("Unhandled Characteristic UUID: \(characteristic.uuid)")
         }
     }
-    
+
     private func heartRate(from characteristic: CBCharacteristic) -> Int {
-        guard let characteristicData = characteristic.value else { return -1 }
+        guard let characteristicData = characteristic.value else {
+            return -1
+        }
         let byteArray = [UInt8](characteristicData)
-        
+
         let firstBitValue = byteArray[0] & 0x01
         if firstBitValue == 0 {
             // Heart Rate Value Format is in the 2nd byte
