@@ -9,7 +9,7 @@
 import UIKit
 import AVFoundation
 import CoreBluetooth
-
+import CoreData
 
 class ViewController: UIViewController {
 
@@ -54,8 +54,15 @@ class ViewController: UIViewController {
         roundDemButtons()
         initTimes();
         startupBluetooth()
+        loadUpData()
     }
 
+    private func loadUpData(){
+        let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+        let entity = NSEntityDescription.entity(forEntityName: "Runs", in: context)
+        let newUser = NSManagedObject(entity: entity!, insertInto: context)
+        newUser.setValue("1234", forKey: "count")
+    }
 
     private func roundDemButtons() {
         goButton.layer.cornerRadius = 4
@@ -64,7 +71,6 @@ class ViewController: UIViewController {
 
     func startupBluetooth() {
         centralManager = CBCentralManager(delegate: self, queue: nil)
-
     }
 
     //MARK: Actions
